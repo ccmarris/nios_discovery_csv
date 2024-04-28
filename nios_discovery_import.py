@@ -228,7 +228,7 @@ def main():
     # Read inifile
     config = read_ini(inifile)
 
-    upload_csv(config, file, view=args.view):
+    upload_csv(config, file, view=args.view)
 
     return exitcode
 
