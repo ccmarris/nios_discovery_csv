@@ -4,11 +4,10 @@
 
  Description:
 
-    Import CSV File for Infoblox NIOS and perform appropriate action.
-    Allows for the monitoring of the CSV job progress.
+    Infoblox NIOS Discovery CSV Import
 
  Requirements:
-   Python 3.6+
+   Python 3.8+
 
  Author: Chris Marrison
 
@@ -43,7 +42,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 
 '''
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -72,10 +71,8 @@ def parseargs():
                         help="Override ini file")
     parse.add_argument('-f', '--file', type=str, default='csv_data.csv',
                         help="Override csv import file")
-    parse.add_argument('-m', '--monitor', action='store_true', 
-                        help="Monitor Status of Import")
-    parse.add_argument('-s', '--status', type=str, 
-                        help="Get Status of CSV Import Job Specified")
+    parse.add_argument('-v', '--view', type=str, 
+                        help="Network View", default='default')
     parse.add_argument('-a', '--action', type=str, 
                         help="Change default action of INSERT (e.g. DELETE) for CSV Import")
     parse.add_argument('-d', '--debug', action='store_true', 
@@ -98,7 +95,7 @@ def read_ini(ini_filename):
     # Local Variables
     cfg = configparser.ConfigParser()
     config = {}
-    ini_keys = ['gm', 'api_version', 'valid_cert', 'user', 'pass', 'sleep']
+    ini_keys = ['gm', 'api_version', 'valid_cert', 'user', 'pass']
 
     # Attempt to read api_key from ini file
     try:
@@ -136,10 +133,11 @@ def sanitize_filename(pathname):
     return filename
 
 
-def upload_csv(config, file, action="INSERT"):
+def upload_csv(config, file, view="default"):
     '''
     Upload CSV and execute
     '''
+    status = False
     url = 'https://' + config['gm'] + '/wapi/' + config['api_version'] + '/'
     id = config['user']
     pw = config['pass']
@@ -197,80 +195,24 @@ def upload_csv(config, file, action="INSERT"):
     # Initiate the actual import task.
     req_params = {'token': upload_token,
                 'merge_data': True,
-                'network_view': 'default' }
+                'network_view': view }
     r = requests.post(url + 'fileop?_function=setdiscoverycsv',
                     params=req_params,
                     cookies=req_cookies,
                     verify=valid_cert)
-    if r.status_code != requests.codes.ok:
+    if r.status_code in requests.codes.ok:
+        status = True
+        print('Discovery data imported')
+    else:
+        status = False
         print(r.text)
         exit_msg = 'Error {} starting discovery import: {}'
         sys.exit(exit_msg.format(r.status_code, r.reason))
-    else:
-        print('Discovery import complete')
 
-    results = r.json()
-
-    print(r.json())
-    csvimporttask = results
-
-    '''
-    # Record cvsimporttask object reference for possible future use.
-    csvimporttask = results['csv_import_task']['_ref']
-    '''
-
-    return csvimporttask
-
-
-def check_csv_status(config, csvjob):
-    '''
-    Check status of CSV import
-    '''
-    status = 'PENDING'
-    sleep = int(config['sleep'])
-    stop_monitor = ['COMPLETED', 'FAILED', 'STOPPED']
-
-    url = ( 'https://' + config['gm'] + '/wapi/' 
-          + config['api_version'] + '/' + csvjob )
-
-    if config['valid_cert'] == 'true':
-        valid_cert = True
-    else:
-        valid_cert = False
-
-    # Avoid error due to a self-signed cert.
-    if not valid_cert:
-        requests.packages.urllib3.disable_warnings()
-    
-    wapi_session = requests.session()
-    wapi_session.auth = (config['user'], config['pass'])
-    wapi_session.verify = valid_cert
-
-    while status not in stop_monitor:
-        response = wapi_session.get(url)
-        result = response.json()
-        if response.status_code == requests.codes.ok:
-            status = result['status']
-        else:
-            status = 'WAPI_ERROR'
-        print('Status: {}    Processed: {} lines'
-             .format(status, result['lines_processed']), end='\r', flush=True)
-        if status not in stop_monitor:
-            time.sleep(sleep)
-
-    start_time = datetime.datetime.fromtimestamp(result['start_time'])
-    end_time = datetime.datetime.fromtimestamp(result['end_time'])
-    run_time = end_time - start_time
-    lines_success = int(result['lines_processed']) - int(result['lines_failed'])
-
-    print()
-    print('Final status: {}'.format(status))
-    print('Lines completed successfully: {}'.format(lines_success))
-    print('Start Time: {}'.format(start_time))
-    print('End Time: {}'.format(end_time))
-    print('Import took: {}s'.format(run_time))
+    # results = r.json()
 
     return status
+
 
 def main():
     '''
@@ -286,19 +228,7 @@ def main():
     # Read inifile
     config = read_ini(inifile)
 
-    if args.status:
-        status = check_csv_status(config, args.status)
-        print('Import status: {}'.format(status))
-    else:
-        if args.action:
-            csvjob = upload_csv(config, file, action=args.action)
-            print('CSV Job Reference: {}'.format(csvjob))
-        else:
-            csvjob = upload_csv(config, file)
-            print('CSV Job Reference: {}'.format(csvjob))
-
-        if args.monitor:
-            status = check_csv_status(config, csvjob)
+    upload_csv(config, file, view=args.view):
 
     return exitcode
 
