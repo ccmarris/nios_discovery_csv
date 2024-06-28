@@ -200,7 +200,7 @@ def upload_csv(config, file, view="default"):
                     params=req_params,
                     cookies=req_cookies,
                     verify=valid_cert)
-    if r.status_code in requests.codes.ok:
+    if r.status_code == requests.codes.ok:
         status = True
         print('Discovery data imported')
     else:

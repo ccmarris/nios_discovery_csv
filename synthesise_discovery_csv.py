@@ -47,11 +47,12 @@ __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
 import logging
+import argparse
+import json
+import ipaddress
 import os
 import sys
 import requests
-import argparse
-import configparser
 import datetime
 import time
 
@@ -82,6 +83,49 @@ def parseargs():
 
     return parse.parse_args()
 
+
+def import_fields(filename:str = 'discovery_fields.json'):
+	'''
+    '''
+	try:
+		logging.info(f'Loading field definitions from: {filename}')
+		f = open(filename)
+		fields = json.load(f)
+		logging.info('Field definitions loaded')
+	except:
+		logging.error(f'Failed to import field definitions from: {filename}')
+		raise
+
+	return fields
+
+
+def build_field_test(filename:str = 'field_test_import.csv',
+                      fields:dict = {}):
+    '''
+    '''
+    field_names: list
+    ipv4: ipaddress.IPv4Address 
+    octet: int
+
+    logging.info('Generating field list')
+    for field in fields.keys():
+        field_names.append(fields.get(field))
+    
+    logging.info('')
+
+    for index in range(len(field_names)):
+        octet = 10 + index
+        ipv4 = ipaddress.ip_address(f'192.168.1.{octet}')
+        
+        
+        
+        
+
+
+	
+	
+
+	
 
 
 def main():
